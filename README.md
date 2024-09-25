@@ -19,8 +19,8 @@ circoblock [OPTIONS] [-n Name] [-g Sequence.fasta] [-s1 species1] [-s2 species2]
 |          | --lengths1         | lengths file for species1  |
 |          | --lengths2         | lengths file for species2  |
 |          | --chr_cutoff         | Cutoff for chromosome length in bp (Default 1Mbp = 1e6)  |
-|          | --chain_cutoff         | Cutoff for chromosome length in bp (Default 1Kbp = 1e6)  |
-|          | --cont_chain_cutoff         | Cutoff for chromosome length in bp (Default 1Mbp = 1e6)  |
+|          | --chain_cutoff         | Cutoff for chromosome length in bp (Default 1Kbp = 1e4)  |
+|          | --cont_chain_cutoff         | Cutoff for chromosome length in bp (Default 1Kbp = 1e4)  |
 |          | --cont_block_cutoff         | Cutoff for chromosome length in bp (Default 1Mbp = 1e6)  |
 |          | --circos_cutoff         | Cutoff for chromosome length in bp (Default 1Mbp = 1e6)  |
 | -o          | --outdir         | Output directory (Default = circoblock_Name)  |

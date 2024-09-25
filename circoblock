@@ -168,10 +168,9 @@ arg="$1"
   
   if [ -z ${tblastn+x} ]
   then
-  ## TODO
   if [ ! -f $script_dir"/At_blocks.tar.gz" ]
   then
-   wget github/At_blocks.tar.gz -O - |
+   wget https://github.com/kalimero0411/circoblock/raw/refs/heads/main/At_blocks.tar.gz -O - |
    tar -xvzf - -C $tmpdir
   else
    tar -xvzf $script_dir"/At_blocks.tar.gz" -C $tmpdir

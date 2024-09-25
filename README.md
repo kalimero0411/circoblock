@@ -32,12 +32,12 @@ circoblock [OPTIONS] [-n Name] [-g Sequence.fasta] [-s1 species1] [-s2 species2]
 
 ### Run tblastn and then circlize
 ```
-	circoblock --threads 32 --name At_vs_Ah --genome TAIR10_genome.fa --gff1 TAIR10.gff3 --gff1 species2.bed --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir At_sp2
+circoblock --threads 32 --name At_vs_Ah --genome TAIR10_genome.fa --gff1 TAIR10.gff3 --gff1 species2.bed --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir At_sp2
 ```
 
 ### Run just the circlize
 ```
-	circoblock --threads 32 --name At_vs_Ah --genome TAIR10_genome.fa --tblastn At.sp2.tblastn --gff1 TAIR10.gff3 --gff1 species2.bed --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir At_sp2
+circoblock --threads 32 --name At_vs_Ah --genome TAIR10_genome.fa --tblastn At.sp2.tblastn --gff1 TAIR10.gff3 --gff1 species2.bed --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir At_sp2
 ```
 
 

@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# set -e
+set -e
 
 # Default parameters
+version=24.09
 script_dir=$(dirname $(readlink --canonicalize "${BASH_SOURCE[0]}"))
 chr_cutoff=1e6
 chain_cutoff=1e4
 cont_chain_cutoff=1e4
 cont_block_cutoff=1e6
 circos_cutoff=1e6
-threads=$(command -v nproc --all &> /dev/null && nproc || echo 1)
+threads=$(command nproc --all || echo 1)
 
 # Cleanup temp files
 tmpdir=$(mktemp --tmpdir=/tmp --directory circoblock.XXXXXXXXXX)
@@ -21,15 +22,14 @@ trap cleanup EXIT
 function print_usage(){
  printf "Create ancestral block-wise circos plots for Brassicales-related speices
 
-circoblock [OPTIONS] [-n Name] [-g Sequence.fasta] [-s1 species1] [-s2 species2] [-c species1.species2.final.chain] [--gff1 species1.gff] [--gff2 species2.bed] [--lengths1 species1.lengths] [--lengths2 species2.lengths] [-o outdir]
-	-n | --name\t Name of the run
+circoblock [OPTIONS] [-g Sequence.fasta] [-s1 species1] [-s2 species2] [-c species1.species2.final.chain] [--gff1 species1.gff] [--gff2 species2.bed] [--lengths1 species1.lengths] [--lengths2 species2.lengths] [-o outdir]
 	-g | --genome\t Query genome FASTA file (for Arabidopsis block matching)
 	-b | --tblastn\t tBLASTn output file (skip mapping step)
 	-s1 | --species1\t Query species name
 	-s2 | --species2\t Subject species name
 	-c | --chain\t Chain file (required)
-	--gff1\t gff/gtf/bed file for species1
-	--gff2\t gff/gtf/bed file for species2
+	--gff1\t gff/gtf/bed file for species1 (multiple annotations comma separated in the same order)
+	--gff2\t gff/gtf/bed file for species2 (multiple annotations comma separated in the same order)
 	--lengths1\t lengths file for species1
 	--lengths2\t lengths file for species2
 	--chr_cutoff\t Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
@@ -37,8 +37,9 @@ circoblock [OPTIONS] [-n Name] [-g Sequence.fasta] [-s1 species1] [-s2 species2]
 	--cont_chain_cutoff\t Cutoff for chromosome length in bp (Default 1Kbp = 1e4)
 	--cont_block_cutoff\t Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
 	--circos_cutoff\t Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
-	-o | --outdir\t Output directory (Default = circoblock_Name)
+	-o | --outdir\t Output directory (Default = circoblock_DateTime in the current directory)
 	-t | --threads\t Number of CPU threads to use (Default = Detected processors or 1)
+	--version\t Version
 	-h | --help\t Print help
 
 	Before running, please map the genome using make_lastz_chains (https://github.com/hillerlab/make_lastz_chains):
@@ -46,10 +47,7 @@ circoblock [OPTIONS] [-n Name] [-g Sequence.fasta] [-s1 species1] [-s2 species2]
 	
 	Length files are tab-delimited: chromosome [TAB] length
 	
-	Example: circoblock --threads 32 --name At_vs_Ah --genome TAIR10_genome.fa --gff1 TAIR10.gff3 --gff1 species2.bed --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir At_sp2
-	
-	
-	
+	Example: circoblock --threads 32 --genome TAIR10_genome.fa --gff1 TAIR10.gff3 --gff1 TAIR10_TEs.gtf --gff1 species2_genes.bed --gff2 species2_TEs.gff --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir At_sp2
 "
 }
 
@@ -57,10 +55,6 @@ while [ "$#" -gt 0 ]
 do
 arg="$1"
  case $arg in
-  -n | --name)
-  name="$2" # Run name
-  shift 2
-  ;;
   -g | --genome)
   genome=$(readlink --canonicalize "$2") # genome FASTA file path
   shift 2
@@ -82,11 +76,11 @@ arg="$1"
   shift 2
   ;;
   --gff1)
-  gff1=$(readlink --canonicalize "$2") # path to gff/gtf/bed file for species1
+  gff1="$2" # path to gff/gtf/bed file for species1
   shift 2
   ;;
   --gff2)
-  gff2=$(readlink --canonicalize "$2") # path to gff/gtf/bed file for species2
+  gff2="$2" # path to gff/gtf/bed file for species2
   shift 2
   ;;
   --lengths1)
@@ -125,6 +119,10 @@ arg="$1"
   threads="$2" # Threads
   shift 2
   ;;
+  --version)
+  echo "circoblock version "$version >&2
+  exit 0
+  ;;
   -h | --help)
   print_usage
   exit 1
@@ -142,11 +140,19 @@ arg="$1"
   esac
  done
 
+ # Dependencies
   if ! command -v tblastn &> /dev/null
   then
    echo "BLAST not installed" >&2
    echo "sudo apt install ncbi-blast+" >&2
    deps+="blast"
+  fi
+
+  if ! command -v Rscript &> /dev/null
+  then
+   echo "R not installed" >&2
+   echo "sudo apt install r-base" >&2
+   deps+="rscript"
   fi
   
   if [ ! -z ${deps+x} ]
@@ -154,27 +160,60 @@ arg="$1"
    exit 1
   fi
   
-  if [ -z ${outdir+x} ]
+  if [ -z ${genome+x} ] && [ -z ${tblastn+x} ]
   then
-   outdir="circoblock_"$name
-   mkdir "circoblock_"$name
+   echo "Required: One of '--genome' or '--tblastn'" >&2
+   exit 1
   fi
   
+  if [ -z ${chain+x} ] || [ -z ${species1+x} ] || [ -z ${species2+x} ] || [ -z ${gff1+x} ] || [ -z ${gff2+x} ] || [ -z ${lengths1+x} ] || [ -z ${lengths2+x} ]
+  then
+   echo "Required: All of --chain, --tblastn, --species1, --species2, --gff1, --gff2, --lengths1, and --lengths2" >&2
+   exit 1
+  fi
+  
+  if [ -z ${outdir+x} ]
+  then
+   outdir="circoblock_"$(date +"%Y%m%d_%H%M")
+   mkdir $outdir
+  fi
+  
+  # split gffs
+  OFS=$IFS
+  IFS=","
+  for i in ${gff1[*]}
+  do
+   readlink --canonicalize $i >> $tmpdir"/gff1.tmp"
+  done
+  for i in ${gff2[*]}
+  do
+   readlink --canonicalize $i >> $tmpdir"/gff2.tmp"
+  done
+  gff1=$(cat $tmpdir"/gff1.tmp" | tr "\n" "," | sed --regexp-extended 's/,$//g')
+  gff2=$(cat $tmpdir"/gff2.tmp" | tr "\n" "," | sed --regexp-extended 's/,$//g')
+  IFS=$OFS
+  
+  # decompress chain file
   if [ $(file --brief $chain | cut --fields=1 --delimiter=" ") = "gzip" ]
   then
    gunzip --stdout $chain > $tmpdir"/final.chain"
    chain=$tmpdir"/final.chain"
   fi
   
+  # Map blocks to genome
   if [ -z ${tblastn+x} ]
   then
-  if [ ! -f $script_dir"/At_blocks.tar.gz" ]
+  
+  # Get Arabidopsis ACK blocks
+  if [ -f $script_dir"/At_blocks.tar.gz" ]
   then
-   wget https://github.com/kalimero0411/circoblock/raw/refs/heads/main/At_blocks.tar.gz -O - |
-   tar -xvzf - -C $tmpdir
+   tar -xzf $script_dir"/At_blocks.tar.gz" -C $tmpdir
   else
-   tar -xvzf $script_dir"/At_blocks.tar.gz" -C $tmpdir
+   wget --quiet https://github.com/kalimero0411/circoblock/raw/refs/heads/main/At_blocks.tar.gz -O - |
+   tar -xzf - -C $tmpdir
   fi
+  
+  # tBLASTn
   makeblastdb -in $genome -dbtype nucl
   mkdir $tmpdir/tblastn
   for block_pep in $tmpdir/At_blocks/*.genes.pep
@@ -186,44 +225,46 @@ arg="$1"
    -evalue 1e-5 \
    -max_target_seqs 100 \
    -outfmt "6 qacc sacc sstart send length sstrand pident qstart qend evalue" \
-   -num_threads 32 \
+   -num_threads $threads \
    -out $tmpdir"/tblastn/"$(basename ${block_pep/.genes.pep/.genes.tblastn})
   done
   
+  # Filter tBLASTn results (100aa length, 80% pident, 5% of matches)
   for blast_out in $tmpdir/tblastn/*.genes.tblastn
   do
    block=$(basename ${blast_out/.genes.tblastn})
-   echo "Filtering block "$block
+   echo -en "\rFiltering block: "$block"    "
    gene_num=$(grep --count ">" $tmpdir/At_blocks/$(basename ${blast_out/.tblastn/.pep})); \
    awk -F $'\t' '{OFS="\t"}; $5 >= 100 && $7 >= 80{print $0}' $blast_out |
-   sort -uk3,5 |
-   cut -f2 |
+   tee $tmpdir"/filtered.tblastn" |
+   sort --parallel="$threads" --unique --key=3,5 |
+   cut --fields=2 |
    sort |
-   uniq -c |
-   sed -E 's/^ +//g; s/ /\t/g' |
+   uniq --count |
+   sed --regexp-extended 's/^ +//g; s/ /\t/g' |
    awk -v gene_num=$gene_num -F $'\t' '{OFS="\t"}; 100*$1/gene_num >= 5{print $2}' |
-   grep -f - <(awk -F $'\t' '{OFS="\t"}; $5 >= 100 && $7 >= 80{print $0}' $blast_out) |
+   grep --file=- $tmpdir"/filtered.tblastn" |
    awk -v block=$block -F $'\t' '{OFS="\t"}; {print block,$0}' |
-   sort -uk3,5 \
-   >> $outdir"/"$(sed 's/ /_/g' "$species1")".blocks.tblastn"
-   echo ""
+   sort --parallel="$threads" --unique --key=3,5 \
+   >> $tmpdir/output.tblastn
  done
- 
- tblastn=$(readlink --canonicalize $outdir"/"$(sed 's/ /_/g' "$species1")".blocks.tblastn")
- echo "For future runs of ""$species1"", the output of this mapping can be reused by including:" >&2
- echo "--tblastn "$tblastn >&2
+  
+  echo ""
+  tblastn=$(readlink --canonicalize $outdir"/"$(sed 's/ /_/g' "$species1")".blocks.tblastn")
+  cp $tmpdir/output.tblastn $tblastn
+  echo "For future runs of ""$species1"", the output of this mapping can be reused by including:" >&2
+  echo "--tblastn "$tblastn >&2
  fi
  
  
- Rscript circos_chain.R \
+ Rscript $script_dir"/circos_chain.R" \
  --wd $outdir \
- --name $name \
  --chain $chain \
  --blocks $tblastn \
  --species1 "$species1" \
  --species2 "$species2" \
- --gff1 $gff1 \
- --gff2 $gff2 \
+ --gff1 "$gff1" \
+ --gff2 "$gff2" \
  --lengths1 $lengths1 \
  --lengths2 $lengths2 \
  --chr_cutoff $chr_cutoff \
@@ -231,3 +272,5 @@ arg="$1"
  --cont_chain_cutoff $cont_chain_cutoff \
  --cont_block_cutoff $cont_block_cutoff \
  --circos_cutoff $circos_cutoff
+ 
+ echo "circoblock done" >&2

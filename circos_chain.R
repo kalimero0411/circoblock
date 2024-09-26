@@ -1,14 +1,21 @@
-
 packages = c("circlize","R.utils","EnrichedHeatmap","rtracklayer","dplyr")
+
 invisible(
   suppressMessages(
-    sapply(packages,FUN = function(x) {
-      if(!x %in% rownames(installed.packages())){
+    if(!require("BiocManager",character.only = TRUE,quietly = TRUE)){
+      cat("Installing BiocManager\n",sep = "")
+      install.packages("BiocManager")
+  }))
+
+cat("#####   Loading packages   #####\n")
+invisible(
+  suppressMessages(
+    lapply(packages,function(x){
+      if(!require(x,character.only = TRUE,quietly = TRUE)){
         cat("Installing package: ",x,"\n",sep = "")
         BiocManager::install(x,update = FALSE,ask = FALSE)
+        library(x,character.only = TRUE,quietly = TRUE)
       }
-      cat("#####   Loading package: ",x,"   #####\n",sep = "")
-      library(x,character.only = TRUE)
     })))
 
 options(stringsAsFactors = FALSE)
@@ -45,8 +52,8 @@ if(!interactive()){
   init_params[["blocks"]] = normalizePath(args[["blocks"]])
   init_params[["species1"]] = gsub(pattern = " ",replacement = "_",args[["species1"]])
   init_params[["species2"]] = gsub(pattern = " ",replacement = "_",args[["species2"]])
-  init_params[["gff1"]] = normalizePath(args[["gff1"]])
-  init_params[["gff2"]] = normalizePath(args[["gff2"]])
+  init_params[["gff1"]] = normalizePath(strsplit(args[["gff1"]],split = ",")[[1]])
+  init_params[["gff2"]] = normalizePath(strsplit(args[["gff2"]],split = ",")[[1]])
   init_params[["lengths1"]] = normalizePath(args[["lengths1"]])
   init_params[["lengths2"]] = normalizePath(args[["lengths2"]])
   if("chr_cutoff" %in% names(args)){
@@ -87,8 +94,9 @@ if(!interactive()){
   init_params[["blocks"]] = normalizePath(selectFile(caption = "Select tBLASTn block alignment file",path = init_params[["wd"]]))
   init_params[["species1"]] = gsub(pattern = " ",replacement = "_",readline(prompt = "Select species 1 name: "))
   init_params[["species2"]] = gsub(pattern = " ",replacement = "_",readline(prompt = "Select species 2 name: "))
-  init_params[["gff1"]] = normalizePath(selectFile(caption = "Select species 1 gff file",path = init_params[["wd"]]))
-  init_params[["gff2"]] = normalizePath(selectFile(caption = "Select species 2 gff file",path = init_params[["wd"]]))
+  num_anno = as.numeric(readline(prompt = "number of annotations per species: "))
+  init_params[["gff1"]] = sapply(1:num_anno,function(x) normalizePath(selectFile(caption = "Select species 1 gff file",path = init_params[["wd"]])))
+  init_params[["gff2"]] = sapply(1:num_anno,function(x) normalizePath(selectFile(caption = "Select species 2 gff file",path = init_params[["wd"]])))
   init_params[["lengths1"]] = normalizePath(selectFile(caption = "Select species 1 chromosome lengths file",path = init_params[["wd"]]))
   init_params[["lengths2"]] = normalizePath(selectFile(caption = "Select species 2 chromosome lengths file",path = init_params[["wd"]]))
   
@@ -110,19 +118,19 @@ if(!interactive()){
   }
 }
 
+cat("#####   Getting lengths   #####\n")
 chr_lengths = list(species1 = read.table(file = init_params[["lengths1"]],header = FALSE,sep = "\t",col.names = c("chr","length")),
                    species2 = read.table(file = init_params[["lengths2"]],header = FALSE,sep = "\t",col.names = c("chr","length")))
 chr_lengths = list(species1 = chr_lengths$species1[chr_lengths$species1$length >= init_params[["chr_cutoff"]],],
                    species2 = chr_lengths$species2[chr_lengths$species2$length >= init_params[["chr_cutoff"]],])
 
-conv2bed = function(file){
+conv2bed = function(file,chrs){
   if(grepl(pattern = "[.]g[tf]f3?$",x = basename(file),perl = TRUE)){
     gtff = read.table(file,
                      quote = "",
                      header = FALSE,
                      sep = "\t",
                      col.names = c("chr","source","feature","start","end","score","strand","frame","attribute"))
-    gtff = gtff[gtff$feature %in% "gene",,drop = FALSE]
     res = data.frame(chr = gtff$chr,
                      start = gtff$start,
                      end = gtff$end,
@@ -139,16 +147,12 @@ conv2bed = function(file){
                      header = FALSE,
                      sep = "\t",
                      col.names = c("chr","start","end","name","score","strand","source","type","phase","attribute"))
-    res = res[res$type %in% "gene",,drop = FALSE]
   }
+  res = res[res$chr %in% chrs,,drop = FALSE]
   return(res)
 }
 
-genes_list = lapply(c(init_params$gff1,init_params$gff2),function(file){
-    return(conv2bed(file))
-  })
-names(genes_list) = c("species1","species2")
-
+cat("#####   Getting links   #####\n")
 chain = import.chain(init_params[["chain"]])
 genome_df = data.frame(chr = chr_lengths$species2$chr,
                        start = rep(0,length(chr_lengths$species2$chr)),
@@ -180,11 +184,21 @@ species2_chromInfo = data.frame(chr = species2_chr,
                             end = chr_lengths$species2$length[match(species2_chr,chr_lengths$species2$chr)])
 
 
-norm_factor <- min(sum(species1_chromInfo$end), sum(species2_chromInfo$end))
+norm_factor = min(sum(species1_chromInfo$end), sum(species2_chromInfo$end))
 
-species1_chromInfo$normalized_length <- with(species1_chromInfo, end / sum(species1_chromInfo$end) * norm_factor)
-species2_chromInfo$normalized_length <- with(species2_chromInfo, end / sum(species2_chromInfo$end) * norm_factor)
+species1_chromInfo$normalized_length = species1_chromInfo$end / sum(species1_chromInfo$end) * norm_factor
+species2_chromInfo$normalized_length = species2_chromInfo$end / sum(species2_chromInfo$end) * norm_factor
 chromInfo = rbind(species2_chromInfo,species1_chromInfo)
+
+
+cat("#####   Getting annotations   #####\n")
+genes_list = lapply(1:length(init_params[["gff1"]]),function(anno_idx){
+                 res = list(species1 = conv2bed(file = init_params$gff1[[anno_idx]],
+                                                chrs = chr_lengths$species1$chr),
+                            species2 = conv2bed(file = init_params$gff2[[anno_idx]],
+                                                chrs = chr_lengths$species2$chr))
+                 return(res)
+})
 
 df_combined = cbind(species1_df,species2_df)
 colnames(df_combined) = c("chr_to","start_to","end_to","chr","start","end")
@@ -252,13 +266,8 @@ link_colors = sapply(1:nrow(species1_df),function(x){
 
 ### per block
 for(block_select in unique(chr_color$Block)){
-  cat("Outputing ",gsub(pattern = "_",replacement = " ",x = init_params$species1),
-      " vs. ",
-      gsub(pattern = "_",replacement = " ",x = init_params$species2),
-      " to ",
-      paste0(init_params$wd,"/",init_params$name,"/",init_params$species1,"_",init_params$species2,"_",block_select,"_block.png"),
-      "\n",sep = "")
-  png(filename = paste0(init_params$wd,"/",init_params$name,"/",init_params$species1,"_",init_params$species2,"_",block_select,"_block.png"),width = 2900,height = 2160,units = "px",res = 600)
+  cat("\r### Creating circos plot for block ",block_select," ###    ",sep = "")
+  png(filename = paste0(init_params$wd,"/",init_params$species1,"_",init_params$species2,"_",block_select,"_block.png"),width = 2900,height = 2160,units = "px",res = 600)
   circos.par(gap.degree = c(rep(1, length(species2_chr) - 1), 5, rep(1, length(species1_chr) - 1),5),start.degree = -2.5)
 
 circos.genomicInitialize(chromInfo, plotType = NULL, sector.width = chromInfo$normalized_length,)
@@ -277,11 +286,13 @@ suppressMessages(
 highlight.chromosome(species1_chr, col = "blue", track.index = 2)
 highlight.chromosome(species2_chr, col = "red", track.index = 2)
 
-circos.genomicDensity(genes_list,
-                     window.size = init_params$circos_cutoff,
-                     col = c("blue","red"),
-                     track.height = mm_h(3),
-                     track.margin = c(0,0),bg.border = NA)
+for(anno_idx in 1:length(init_params$gff1)){
+  circos.genomicDensity(genes_list[[anno_idx]],
+                        window.size = init_params$circos_cutoff,
+                        col = c("blue","red"),
+                        track.height = mm_h(3),
+                        track.margin = c(0,0),bg.border = NA)
+}
 
 tmp_block = contiguous_regions[contiguous_regions$block %in% block_select,,drop = FALSE]
 df_block = apply(species1_df,MARGIN = 1,function(x) any(tmp_block$chr %in% x[1] & as.numeric(x[2]) > tmp_block$start & as.numeric(x[2]) < tmp_block$end))
@@ -293,17 +304,12 @@ while(!is.null(dev.list())) dev.off()
 
 circos.clear()
 }
+cat("\n")
 
 ### per chr
 for(chr_select in unique(species1_df$chr)){
-  cat("Outputing ",gsub(pattern = "_",replacement = " ",x = init_params$species1),
-      " vs. ",
-      gsub(pattern = "_",replacement = " ",x = init_params$species2),
-      " to ",
-      paste0(init_params$wd,"/",init_params$name,"/",init_params$species1,"_",init_params$species2,"_",chr_select,"_chr.png"),
-      "\n",sep = "")
-  
-  png(filename = paste0(init_params$wd,"/",init_params$name,"/",init_params$species1,"_",init_params$species2,"_",chr_select,"_chr.png"),width = 2900,height = 2160,units = "px",res = 600)
+  cat("\r### Creating circos plot for chromosome ",chr_select," ###            ",sep = "")  
+  png(filename = paste0(init_params$wd,"/",init_params$species1,"_",init_params$species2,"_",chr_select,"_chr.png"),width = 2900,height = 2160,units = "px",res = 600)
   circos.par(gap.degree = c(rep(1, length(species2_chr) - 1), 5, rep(1, length(species1_chr) - 1),5),start.degree = -2.5)
   
   circos.genomicInitialize(chromInfo, plotType = NULL, sector.width = chromInfo$normalized_length,)
@@ -321,12 +327,14 @@ for(chr_select in unique(species1_df$chr)){
   highlight.chromosome(species1_chr, col = "blue", track.index = 2)
   highlight.chromosome(species2_chr, col = "red", track.index = 2)
   
-  circos.genomicDensity(genes_list,
-                        window.size = init_params$circos_cutoff,
-                        col = rainbow(nrow(chromInfo)),
-                        track.height = 0.05,
-                        track.margin = c(0,0))
-
+  for(anno_idx in 1:length(init_params$gff1)){
+    circos.genomicDensity(genes_list[[anno_idx]],
+                          window.size = init_params$circos_cutoff,
+                          col = c("blue","red"),
+                          track.height = mm_h(3),
+                          track.margin = c(0,0),bg.border = NA)
+  }
+  
   circos.genomicLink(species2_df[species1_df$chr %in% chr_select,], species1_df[species1_df$chr %in% chr_select,], col = add_transparency(col = link_colors[species1_df$chr %in% chr_select],transparency = 0.9))
   text(1, -1, bquote(italic(.(gsub(pattern = "_",replacement = " ",init_params$species2)))),cex = 0.5)
   text(1, 1, bquote(italic(.(gsub(pattern = "_",replacement = " ",init_params$species1)))),cex = 0.5)
@@ -335,16 +343,12 @@ for(chr_select in unique(species1_df$chr)){
   circos.clear()
 
 }
+cat("\n")
 
 ## All chrs
-cat("Outputing ",gsub(pattern = "_",replacement = " ",x = init_params$species1),
-    " vs. ",
-    gsub(pattern = "_",replacement = " ",x = init_params$species2),
-    " to ",
-    paste0(init_params$wd,"/",init_params$name,"/",init_params$species1,"_",init_params$species2,"_Allchr.png"),
-    "\n",sep = "")
+cat("### Create circos plot for all chromosomes and blocks ###\n",sep = "")
 
-png(filename = paste0(init_params$wd,"/",init_params$name,"/",init_params$species1,"_",init_params$species2,"_Allchr.png"),width = 2900,height = 2160,units = "px",res = 600)
+png(filename = paste0(init_params$wd,"/",init_params$species1,"_",init_params$species2,"_Allchr.png"),width = 2900,height = 2160,units = "px",res = 600)
 circos.par(gap.degree = c(rep(1, length(species2_chr) - 1), 5, rep(1, length(species1_chr) - 1),5),start.degree = -2.5)
 
 circos.genomicInitialize(chromInfo, plotType = NULL, sector.width = chromInfo$normalized_length,)
@@ -362,11 +366,14 @@ suppressMessages(
 highlight.chromosome(species1_chr, col = "blue", track.index = 2)
 highlight.chromosome(species2_chr, col = "red", track.index = 2)
 
-circos.genomicDensity(genes_list,
-                      window.size = init_params$circos_cutoff,
-                      col = rainbow(nrow(chromInfo)),
-                      track.height = 0.05,
-                      track.margin = c(0,0))
+for(anno_idx in 1:length(init_params$gff1)){
+  circos.genomicDensity(genes_list[[anno_idx]],
+                        window.size = init_params$circos_cutoff,
+                        col = c("blue","red"),
+                        track.height = mm_h(3),
+                        track.margin = c(0,0),bg.border = NA)
+}
+
 for(chr_select in unique(species1_df$chr)){
   circos.genomicLink(species2_df[species1_df$chr %in% chr_select,], species1_df[species1_df$chr %in% chr_select,], col = add_transparency(col = link_colors[species1_df$chr %in% chr_select],transparency = 0.9))
 }
@@ -376,4 +383,3 @@ while(!is.null(dev.list())) dev.off()
 
 circos.clear()
 unlink(paste0(init_params$wd,"/Rplots.pdf"))
-cat("Circos chain plots done\n")

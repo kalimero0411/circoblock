@@ -225,9 +225,11 @@ arg="$1"
   # tBLASTn
   makeblastdb -in $genome -dbtype nucl
   mkdir $tmpdir/tblastn
-  for block_pep in $tmpdir/At_blocks/*.genes.pep
+  block_files=($tmpdir/At_blocks/*.genes.pep)
+  for ((k=0;k<${#block_files[@]};k++))
   do
-   echo -en "\rMapping block "${block_pep/.genes.pep}"   " >&2
+   block_pep=${block_files[$k]}
+   echo -en "\rMapping block "${block_pep/.genes.pep}" ("$(($k + 1))"/"${#block_files[@]}")   " >&2
    tblastn \
    -query $block_pep \
    -db $genome \
@@ -239,10 +241,12 @@ arg="$1"
   done
   
   # Filter tBLASTn results (100aa length, 80% pident, 5% of matches)
-  for blast_out in $tmpdir/tblastn/*.genes.tblastn
+  blast_files=($tmpdir/tblastn/*.genes.tblastn)
+  for ((k=0;k<${#blast_files[@]};k++))
   do
+   blast_out=${blast_files[$k]}
    block=$(basename ${blast_out/.genes.tblastn})
-   echo -en "\rFiltering block: "$block"   " >&2
+   echo -en "\rFiltering block: "$block" ("$(($k + 1))"/"${#blast_files[@]}")   " >&2
    gene_num=$(grep --count ">" $tmpdir/At_blocks/$(basename ${blast_out/.tblastn/.pep})); \
    awk -F $'\t' '{OFS="\t"}; $5 >= 100 && $7 >= 80{print $0}' $blast_out |
    tee $tmpdir"/filtered.tblastn" |

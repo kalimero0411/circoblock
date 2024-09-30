@@ -28,10 +28,10 @@ circoblock [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species1 speci
 	-s1 | --species1\t Query species name
 	-s2 | --species2\t Subject species name
 	-c | --chain\t Chain file (required)
-	--gff1\t gff/gtf/bed file for species1 (multiple annotations comma separated in the same order)
-	--gff2\t gff/gtf/bed file for species2 (multiple annotations comma separated in the same order)
-	--lengths1\t lengths file for species1
-	--lengths2\t lengths file for species2
+	-g1 | --gff1\t gff/gtf/bed file for species1 (multiple annotations comma separated in the same order)
+	-g2 | --gff2\t gff/gtf/bed file for species2 (multiple annotations comma separated in the same order)
+	-l1 | --lengths1\t lengths file for species1
+	-l2 | --lengths2\t lengths file for species2
 	--chr_cutoff\t Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
 	--chain_cutoff\t Cutoff for chromosome length in bp (Default 1Kbp = 1e4)
 	--cont_chain_cutoff\t Cutoff for chromosome length in bp (Default 1Kbp = 1e4)
@@ -75,20 +75,20 @@ arg="$1"
   species2="$2" # subject species name
   shift 2
   ;;
-  --gff1)
+  -g1 | --gff1)
   gff1="$2" # path to gff/gtf/bed file for species1
   shift 2
   ;;
-  --gff2)
+  -g2 | --gff2)
   gff2="$2" # path to gff/gtf/bed file for species2
   shift 2
   ;;
   --lengths1)
-  lengths1=$(readlink --canonicalize "$2") # path to lengths file for species1
+  -l1 | lengths1=$(readlink --canonicalize "$2") # path to lengths file for species1
   shift 2
   ;;
   --lengths2)
-  lengths2=$(readlink --canonicalize "$2") # path to lengths file for species2
+  -l2 | lengths2=$(readlink --canonicalize "$2") # path to lengths file for species2
   shift 2
   ;;
   --chr_cutoff)

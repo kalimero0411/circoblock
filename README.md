@@ -13,10 +13,10 @@ circoblock [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species1 speci
 | -s1          | --species1         | Query species name  |
 | -s2          | --species2         | Subject species name  |
 | -c          | --chain         | Chain file (required)  |
-|          | --gff1         | gff/gtf/bed file for species1 (multiple annotations comma separated in the same order)  |
-|          | --gff2         | gff/gtf/bed file for species2 (multiple annotations comma separated in the same order)  |
-|          | --lengths1         | lengths file for species1  |
-|          | --lengths2         | lengths file for species2  |
+| -g1         | --gff1         | gff/gtf/bed file for species1 (multiple annotations comma separated in the same order)  |
+| -g2         | --gff2         | gff/gtf/bed file for species2 (multiple annotations comma separated in the same order)  |
+| -l1         | --lengths1         | lengths file for species1  |
+| -l2         | --lengths2         | lengths file for species2  |
 |          | --chr_cutoff         | Cutoff for chromosome length in bp (Default 1Mbp = 1e6)  |
 |          | --chain_cutoff         | Cutoff for chromosome length in bp (Default 1Kbp = 1e4)  |
 |          | --cont_chain_cutoff         | Cutoff for chromosome length in bp (Default 1Kbp = 1e4)  |

@@ -265,9 +265,10 @@ link_colors = sapply(1:nrow(species1_df),function(x){
 ################
 
 ### per block
+dir.create("Blocks")
 for(block_select in unique(chr_color$Block)){
   cat("\r### Creating circos plot for block ",block_select," ###    ",sep = "")
-  png(filename = paste0(init_params$wd,"/",init_params$species1,"_",init_params$species2,"_",block_select,"_block.png"),width = 2900,height = 2160,units = "px",res = 600)
+  png(filename = paste0(init_params$wd,"/Blocks/",init_params$species1,"_",init_params$species2,"_",block_select,"_block.png"),width = 2900,height = 2160,units = "px",res = 600)
   circos.par(gap.degree = c(rep(1, length(species2_chr) - 1), 5, rep(1, length(species1_chr) - 1),5),start.degree = -2.5)
 
 circos.genomicInitialize(chromInfo, plotType = NULL, sector.width = chromInfo$normalized_length,)
@@ -307,9 +308,10 @@ circos.clear()
 cat("\n")
 
 ### per chr
+dir.create("Chromosomes")
 for(chr_select in unique(species1_df$chr)){
   cat("\r### Creating circos plot for chromosome ",chr_select," ###            ",sep = "")  
-  png(filename = paste0(init_params$wd,"/",init_params$species1,"_",init_params$species2,"_",chr_select,"_chr.png"),width = 2900,height = 2160,units = "px",res = 600)
+  png(filename = paste0(init_params$wd,"/Chromosomes/",init_params$species1,"_",init_params$species2,"_",chr_select,"_chr.png"),width = 2900,height = 2160,units = "px",res = 600)
   circos.par(gap.degree = c(rep(1, length(species2_chr) - 1), 5, rep(1, length(species1_chr) - 1),5),start.degree = -2.5)
   
   circos.genomicInitialize(chromInfo, plotType = NULL, sector.width = chromInfo$normalized_length,)

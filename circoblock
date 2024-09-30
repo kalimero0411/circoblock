@@ -172,8 +172,13 @@ arg="$1"
    exit 1
   fi
   
-  if [ -z ${outdir+x} ]
+  if [ ! -z ${outdir+x} ]
   then
+   if [ ! -d ${outdir+x} ]
+   then
+    mkdir $outdir
+   fi
+  else
    outdir="circoblock_"$(date +"%Y%m%d_%H%M")
    mkdir $outdir
   fi

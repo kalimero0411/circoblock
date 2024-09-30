@@ -46,5 +46,6 @@ circoblock --threads 32 --genome TAIR10_genome.fa --tblastn At.sp2.tblastn --gff
 ```
 make_chains.py [input subject genome name] [input query genome name] Subject_genome.fasta Query_genome.fasta --pd chain_dir/ -f --chaining_memory 20
 ```
+- GFF files should only include lines that are should be plotted. (e.g. awk -F $'\t' '$3 == "gene"{print $0}' species.gff) 
 - Length files are tab-delimited: chromosome [TAB] length
 

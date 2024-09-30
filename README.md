@@ -2,13 +2,13 @@
 Create ancestral block-wise circos plots for Brassicales-related speices
 
 ```
-circoblock [OPTIONS] [-g Sequence.fasta] [-s1 species1] [-s2 species2] [-c species1.species2.final.chain] [--gff1 species1.gff] [--gff2 species2.bed] [--lengths1 species1.lengths] [--lengths2 species2.lengths] [-o outdir]
+circoblock [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species1 species1] [--species2 species2] [-c species1.species2.final.chain] [--gff1 species1.gff] [--gff2 species2.bed] [--lengths1 species1.lengths] [--lengths2 species2.lengths] [-o outdir]
 ```
 
 ## Options
 | Short     | Long      | Description     |
 | ------------- | ------------- | -------- |
-| -g         | --genome         | Genome FASTA file  |
+| -g         | --genome         | Genome FASTA file (required for mapping step)  |
 | -b          | --tblastn         | tBLASTn output file (skip mapping step)  |
 | -s1          | --species1         | Query species name  |
 | -s2          | --species2         | Subject species name  |
@@ -48,4 +48,4 @@ make_chains.py [input subject genome name] [input query genome name] Subject_gen
 ```
 - GFF files should only include lines that are should be plotted. (e.g. awk -F $'\t' '$3 == "gene"{print $0}' species.gff) 
 - Length files are tab-delimited: chromosome [TAB] length
-
+- If `--genome` was provided and the mapping set completed, the output can be used again with `--tblastn [species1].blocks.tblastn`

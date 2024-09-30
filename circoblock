@@ -22,8 +22,8 @@ trap cleanup EXIT
 function print_usage(){
  printf "Create ancestral block-wise circos plots for Brassicales-related speices
 
-circoblock [OPTIONS] [-g Sequence.fasta] [-s1 species1] [-s2 species2] [-c species1.species2.final.chain] [--gff1 species1.gff] [--gff2 species2.bed] [--lengths1 species1.lengths] [--lengths2 species2.lengths] [-o outdir]
-	-g | --genome\t Query genome FASTA file (for Arabidopsis block matching)
+circoblock [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species1 species1] [--species2 species2] [-c species1.species2.final.chain] [--gff1 species1.gff] [--gff2 species2.bed] [--lengths1 species1.lengths] [--lengths2 species2.lengths] [-o outdir]
+	-g | --genome\t Query genome FASTA file  (required for mapping step)
 	-b | --tblastn\t tBLASTn output file (skip mapping step)
 	-s1 | --species1\t Query species name
 	-s2 | --species2\t Subject species name
@@ -183,6 +183,8 @@ arg="$1"
    mkdir $outdir
   fi
   
+  echo "circoblock start: "$(date +"%d/%m/%Y %H:%M:%S") >&2
+  
   # split gffs
   OFS=$IFS
   IFS=","
@@ -201,6 +203,7 @@ arg="$1"
   # decompress chain file
   if [ $(file --brief $chain | cut --fields=1 --delimiter=" ") = "gzip" ]
   then
+   echo "Decompressing chain file..." >&2
    gunzip --stdout $chain > $tmpdir"/final.chain"
    chain=$tmpdir"/final.chain"
   fi
@@ -214,6 +217,7 @@ arg="$1"
   then
    tar -xzf $script_dir"/At_blocks.tar.gz" -C $tmpdir
   else
+   echo "Downloading A. thaliana ancestral block genes..." >&2
    wget --quiet https://github.com/kalimero0411/circoblock/raw/refs/heads/main/At_blocks.tar.gz -O - |
    tar -xzf - -C $tmpdir
   fi
@@ -223,7 +227,7 @@ arg="$1"
   mkdir $tmpdir/tblastn
   for block_pep in $tmpdir/At_blocks/*.genes.pep
   do
-   echo "Mapping block "${block_pep/.genes.pep}
+   echo -en "\rMapping block "${block_pep/.genes.pep}"   " >&2
    tblastn \
    -query $block_pep \
    -db $genome \
@@ -238,7 +242,7 @@ arg="$1"
   for blast_out in $tmpdir/tblastn/*.genes.tblastn
   do
    block=$(basename ${blast_out/.genes.tblastn})
-   echo -en "\rFiltering block: "$block"    "
+   echo -en "\rFiltering block: "$block"   " >&2
    gene_num=$(grep --count ">" $tmpdir/At_blocks/$(basename ${blast_out/.tblastn/.pep})); \
    awk -F $'\t' '{OFS="\t"}; $5 >= 100 && $7 >= 80{print $0}' $blast_out |
    tee $tmpdir"/filtered.tblastn" |
@@ -278,4 +282,4 @@ arg="$1"
  --cont_block_cutoff $cont_block_cutoff \
  --circos_cutoff $circos_cutoff
  
- echo "circoblock done" >&2
+ echo "circoblock done: "$(date +"%d/%m/%Y %H:%M:%S") >&2

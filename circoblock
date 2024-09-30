@@ -83,12 +83,12 @@ arg="$1"
   gff2="$2" # path to gff/gtf/bed file for species2
   shift 2
   ;;
-  --lengths1)
-  -l1 | lengths1=$(readlink --canonicalize "$2") # path to lengths file for species1
+  -l1 | --lengths1)
+  lengths1=$(readlink --canonicalize "$2") # path to lengths file for species1
   shift 2
   ;;
-  --lengths2)
-  -l2 | lengths2=$(readlink --canonicalize "$2") # path to lengths file for species2
+  -l2 | --lengths2)
+  lengths2=$(readlink --canonicalize "$2") # path to lengths file for species2
   shift 2
   ;;
   --chr_cutoff)

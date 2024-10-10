@@ -223,7 +223,7 @@ colnames(species1_df) = c("chr","start","end")
 
 ################
 blocks = read.table(file = init_params[["blocks"]], header = FALSE, sep = "\t", col.names = c("Block", "query", "chr", "start", "end", "length", "strand", "pident", "block_start", "block_end", "evalue"))
-blocks$chr = factor(blocks$chr, levels = unique(chr_lengths$species1$chr))
+blocks$chr = factor(blocks$chr, levels = chr_lengths$species1$chr)
 chr_color = data.frame(Block = unique(blocks$Block), color = "")
 chr_color[chr_color$Block %in% c("A", "B", "C"), "color"] = "yellow"
 chr_color[chr_color$Block %in% c("D", "E"), "color"] = "red"
@@ -262,6 +262,21 @@ link_colors = sapply(1:nrow(species1_df),function(x){
   names(res) = species1_df$chr[x]
   return(res)
 })
+
+link_block_colors = sapply(1:nrow(species1_df),function(x){
+  inblock = contiguous_regions$chr %in% species1_df$chr[x] &
+    contiguous_regions$start < species1_df$start[x] &
+    contiguous_regions$end > species1_df$start[x]
+  if(any(inblock)){
+    res = chr_color$color[chr_color$Block %in% contiguous_regions$block[inblock][1]]
+    names(res) = contiguous_regions$block[inblock][1]
+  }else{
+    res = "grey"
+    names(res) = "Non-block"
+  }
+  return(res)
+})
+
 ################
 
 ### per block

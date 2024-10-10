@@ -20,6 +20,15 @@ cleanup(){
 trap cleanup EXIT
 
 function print_usage(){
+ printf "Create ancestral block-wise circos/alluvial plots for Brassicales-related speices
+
+circoblock [plot type]
+	circos\t Create a circos plot for two species and multiple annotation
+	alluvial\t Create an alluvial plot for multiple species
+"
+}
+
+function print_usage_circos(){
  printf "Create ancestral block-wise circos plots for Brassicales-related speices
 
 circoblock [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species1 species1] [--species2 species2] [-c species1.species2.final.chain] [--gff1 species1.gff] [--gff2 species2.bed] [--lengths1 species1.lengths] [--lengths2 species2.lengths] [-o outdir]
@@ -28,10 +37,10 @@ circoblock [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species1 speci
 	-s1 | --species1\t Query species name
 	-s2 | --species2\t Subject species name
 	-c | --chain\t Chain file (required)
-	-g1 | --gff1\t gff/gtf/bed file for species1 (multiple annotations comma separated in the same order)
-	-g2 | --gff2\t gff/gtf/bed file for species2 (multiple annotations comma separated in the same order)
-	-l1 | --lengths1\t lengths file for species1
-	-l2 | --lengths2\t lengths file for species2
+	-g1 | --gff1\t gff/gtf/bed file for species1 (required; multiple annotations comma separated in the same order)
+	-g2 | --gff2\t gff/gtf/bed file for species2 (required; multiple annotations comma separated in the same order)
+	-l1 | --lengths1\t Lengths file for species1 (required)
+	-l2 | --lengths2\t Lengths file for species2 (required)
 	--chr_cutoff\t Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
 	--chain_cutoff\t Cutoff for chromosome length in bp (Default 1Kbp = 1e4)
 	--cont_chain_cutoff\t Cutoff for chromosome length in bp (Default 1Kbp = 1e4)
@@ -47,10 +56,108 @@ circoblock [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species1 speci
 	
 	Length files are tab-delimited: chromosome [TAB] length
 	
-	Example: circoblock --threads 32 --genome TAIR10_genome.fa --gff1 TAIR10.gff3 --gff1 TAIR10_TEs.gtf --gff1 species2_genes.bed --gff2 species2_TEs.gff --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir At_sp2
+	Example: circoblock circos --threads 32 --genome TAIR10_genome.fa --species1 'Arabidopsis thaliana' --species2 'Some species' --gff1 TAIR10.gff3 --gff1 TAIR10_TEs.gtf --gff1 species2_genes.bed --gff2 species2_TEs.gff --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir At_sp2
 "
 }
 
+function print_usage_alluvial(){
+ printf "Create ancestral block-wise alluvial plots for Brassicales-related speices
+
+circoblock [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species1 species1] [--species2 species2] [-c species1.species2.final.chain] [--gff1 species1.gff] [--gff2 species2.bed] [--lengths1 species1.lengths] [--lengths2 species2.lengths] [-o outdir]
+	-g | --genome\t Query genome FASTA file  (required for mapping step)
+	-b | --tblastn\t tBLASTn output file (skip mapping step)
+	-s | --species\t Species names starting with the query species in order (required; comma-separated)
+	-c | --chains\t Chain files starting with the query species in order (required; comma-separated)
+	-l | --lengths\t Lengths files starting with the query species in order (required; comma-separated)
+	--chr_cutoff\t Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
+	--chain_cutoff\t Cutoff for chromosome length in bp (Default 1Kbp = 1e4)
+	--cont_chain_cutoff\t Cutoff for chromosome length in bp (Default 1Kbp = 1e4)
+	--cont_block_cutoff\t Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
+	--circos_cutoff\t Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
+	-o | --outdir\t Output directory (Default = circoblock_DateTime in the current directory)
+	-t | --threads\t Number of CPU threads to use (Default = Detected processors or 1)
+	--version\t Version
+	-h | --help\t Print help
+
+	Before running, please map the genome using make_lastz_chains (https://github.com/hillerlab/make_lastz_chains):
+	make_chains.py [input subject genome name] [input query genome name] Subject_genome.fasta Query_genome.fasta --pd chain_dir/ -f --chaining_memory 20
+	
+	Length files are tab-delimited: chromosome [TAB] length
+	
+	Example: circoblock alluvial --threads 32 --genome TAIR10_genome.fa --lengths 'At.lengths,species2.lengths,species3.lengths' --chains 'chain_dir/At.sp2.final.chain,chain_dir/At.sp3.final.chain' --species 'Arabidopsis thaliana,Some species2,Some species3' --outdir At_sp23
+"
+}
+
+function tblastn_map(){
+  # Get Arabidopsis ACK blocks
+  if [ -f $script_dir"/At_blocks.tar.gz" ]
+  then
+   tar -xzf $script_dir"/At_blocks.tar.gz" -C $tmpdir
+  else
+   echo "Downloading A. thaliana ancestral block genes..." >&2
+   wget --quiet https://github.com/kalimero0411/circoblock/raw/refs/heads/main/At_blocks.tar.gz -O - |
+   tar -xzf - -C $tmpdir
+  fi
+  
+  # tBLASTn
+  makeblastdb -in $genome -dbtype nucl
+  mkdir $tmpdir/tblastn
+  local block_files=($tmpdir/At_blocks/*.genes.pep)
+  for ((k=0;k<${#block_files[@]};k++))
+  do
+   local block_pep=${block_files[$k]}
+   echo -en "\rMapping block "${block_pep/.genes.pep}" ("$(($k + 1))"/"${#block_files[@]}")   " >&2
+   tblastn \
+   -query $block_pep \
+   -db $genome \
+   -evalue 1e-5 \
+   -max_target_seqs 100 \
+   -outfmt "6 qacc sacc sstart send length sstrand pident qstart qend evalue" \
+   -num_threads $threads \
+   -out $tmpdir"/tblastn/"$(basename ${block_pep/.genes.pep/.genes.tblastn})
+  done
+  echo "" >&2
+  
+  # Filter tBLASTn results (100aa length, 80% pident, 5% of matches)
+  local blast_files=($tmpdir/tblastn/*.genes.tblastn)
+  for ((k=0;k<${#blast_files[@]};k++))
+  do
+   local blast_out=${blast_files[$k]}
+   local block=$(basename ${blast_out/.genes.tblastn})
+   echo -en "\rFiltering block: "$block" ("$(($k + 1))"/"${#blast_files[@]}")   " >&2
+   local gene_num=$(grep --count ">" $tmpdir/At_blocks/$(basename ${blast_out/.tblastn/.pep})); \
+   awk -F $'\t' '{OFS="\t"}; $5 >= 100 && $7 >= 80{print $0}' $blast_out |
+   tee $tmpdir"/filtered.tblastn" |
+   sort --parallel="$threads" --unique --key=3,5 |
+   cut --fields=2 |
+   sort |
+   uniq --count |
+   sed --regexp-extended 's/^ +//g; s/ /\t/g' |
+   awk -v gene_num=$gene_num -F $'\t' '{OFS="\t"}; 100*$1/gene_num >= 5{print $2}' |
+   grep --file=- $tmpdir"/filtered.tblastn" |
+   awk -v block=$block -F $'\t' '{OFS="\t"}; {print block,$0}' |
+   sort --parallel="$threads" --unique --key=3,5 \
+   >> $tmpdir/output.tblastn
+ done
+  
+  echo "" >&2
+  declare -g tblastn=$(readlink --canonicalize $outdir"/"$(sed 's/ /_/g' "$species1")".blocks.tblastn")
+  cp $tmpdir/output.tblastn $tblastn
+  echo "For future runs of ""$species1"", the output of this mapping can be reused by including:" >&2
+  echo "--tblastn "$tblastn >&2
+}
+
+if [ "$#" -gt 0 ]
+then
+ plot="$1"
+ shift
+else
+ print_usage
+ exit 1
+fi
+
+if [ ${plot:0:1} = "c" ]
+then
 while [ "$#" -gt 0 ]
 do
 arg="$1"
@@ -124,7 +231,7 @@ arg="$1"
   exit 0
   ;;
   -h | --help)
-  print_usage
+  print_usage_circos
   exit 1
   ;;
   *)
@@ -133,7 +240,7 @@ arg="$1"
    break
   else
   echo "Unknown option: "$1
-  print_usage
+  print_usage_circos
   exit 1
   fi
   ;;
@@ -162,19 +269,19 @@ arg="$1"
   
   if [ -z ${genome+x} ] && [ -z ${tblastn+x} ]
   then
-   echo "Required: One of '--genome' or '--tblastn'" >&2
+   echo "Required: One of --genome or --tblastn" >&2
    exit 1
   fi
   
   if [ -z ${chain+x} ] || [ -z ${species1+x} ] || [ -z ${species2+x} ] || [ -z ${gff1+x} ] || [ -z ${gff2+x} ] || [ -z ${lengths1+x} ] || [ -z ${lengths2+x} ]
   then
-   echo "Required: All of --chain, --tblastn, --species1, --species2, --gff1, --gff2, --lengths1, and --lengths2" >&2
+   echo "Required: All of --chain, --species1, --species2, --gff1, --gff2, --lengths1, and --lengths2" >&2
    exit 1
   fi
   
   if [ ! -z ${outdir+x} ]
   then
-   if [ ! -d ${outdir+x} ]
+   if [ ! -d $outdir ]
    then
     mkdir $outdir
    fi
@@ -211,63 +318,8 @@ arg="$1"
   # Map blocks to genome
   if [ -z ${tblastn+x} ]
   then
-  
-  # Get Arabidopsis ACK blocks
-  if [ -f $script_dir"/At_blocks.tar.gz" ]
-  then
-   tar -xzf $script_dir"/At_blocks.tar.gz" -C $tmpdir
-  else
-   echo "Downloading A. thaliana ancestral block genes..." >&2
-   wget --quiet https://github.com/kalimero0411/circoblock/raw/refs/heads/main/At_blocks.tar.gz -O - |
-   tar -xzf - -C $tmpdir
+   tblastn_map
   fi
-  
-  # tBLASTn
-  makeblastdb -in $genome -dbtype nucl
-  mkdir $tmpdir/tblastn
-  block_files=($tmpdir/At_blocks/*.genes.pep)
-  for ((k=0;k<${#block_files[@]};k++))
-  do
-   block_pep=${block_files[$k]}
-   echo -en "\rMapping block "${block_pep/.genes.pep}" ("$(($k + 1))"/"${#block_files[@]}")   " >&2
-   tblastn \
-   -query $block_pep \
-   -db $genome \
-   -evalue 1e-5 \
-   -max_target_seqs 100 \
-   -outfmt "6 qacc sacc sstart send length sstrand pident qstart qend evalue" \
-   -num_threads $threads \
-   -out $tmpdir"/tblastn/"$(basename ${block_pep/.genes.pep/.genes.tblastn})
-  done
-  
-  # Filter tBLASTn results (100aa length, 80% pident, 5% of matches)
-  blast_files=($tmpdir/tblastn/*.genes.tblastn)
-  for ((k=0;k<${#blast_files[@]};k++))
-  do
-   blast_out=${blast_files[$k]}
-   block=$(basename ${blast_out/.genes.tblastn})
-   echo -en "\rFiltering block: "$block" ("$(($k + 1))"/"${#blast_files[@]}")   " >&2
-   gene_num=$(grep --count ">" $tmpdir/At_blocks/$(basename ${blast_out/.tblastn/.pep})); \
-   awk -F $'\t' '{OFS="\t"}; $5 >= 100 && $7 >= 80{print $0}' $blast_out |
-   tee $tmpdir"/filtered.tblastn" |
-   sort --parallel="$threads" --unique --key=3,5 |
-   cut --fields=2 |
-   sort |
-   uniq --count |
-   sed --regexp-extended 's/^ +//g; s/ /\t/g' |
-   awk -v gene_num=$gene_num -F $'\t' '{OFS="\t"}; 100*$1/gene_num >= 5{print $2}' |
-   grep --file=- $tmpdir"/filtered.tblastn" |
-   awk -v block=$block -F $'\t' '{OFS="\t"}; {print block,$0}' |
-   sort --parallel="$threads" --unique --key=3,5 \
-   >> $tmpdir/output.tblastn
- done
-  
-  echo ""
-  tblastn=$(readlink --canonicalize $outdir"/"$(sed 's/ /_/g' "$species1")".blocks.tblastn")
-  cp $tmpdir/output.tblastn $tblastn
-  echo "For future runs of ""$species1"", the output of this mapping can be reused by including:" >&2
-  echo "--tblastn "$tblastn >&2
- fi
  
  
  Rscript $script_dir"/circos_chain.R" \
@@ -280,10 +332,176 @@ arg="$1"
  --gff2 "$gff2" \
  --lengths1 $lengths1 \
  --lengths2 $lengths2 \
- --chr_cutoff $chr_cutoff \
- --chain_cutoff $chain_cutoff \
- --cont_chain_cutoff $cont_chain_cutoff \
- --cont_block_cutoff $cont_block_cutoff \
- --circos_cutoff $circos_cutoff
+ --chr_cutoff ${chr_cutoff-1e6} \
+ --chain_cutoff ${chain_cutoff-1e4} \
+ --cont_chain_cutoff ${cont_chain_cutoff-1e4} \
+ --cont_block_cutoff ${cont_block_cutoff-1e6} \
+ --circos_cutoff ${circos_cutoff-1e6}
  
- echo "circoblock done: "$(date +"%d/%m/%Y %H:%M:%S") >&2
+ elif [ ${plot:0:1} = "a" ]
+ then
+while [ "$#" -gt 0 ]
+do
+arg="$1"
+ case $arg in
+  -g | --genome)
+  genome=$(readlink --canonicalize "$2") # genome FASTA file path
+  shift 2
+  ;;
+  -b | --tblastn)
+  tblastn=$(readlink --canonicalize "$2") # genome FASTA file path
+  shift 2
+  ;;
+  -c | --chains)
+  IFS=',' read -r -a tmp <<< "$2" # chain file
+  abs=()
+  for file in "${tmp[@]}"; do
+    abs+=("$(readlink -f "$file")")
+  done
+  chains=$(IFS=','; echo "${abs[*]}")
+  shift 2
+  ;;
+  -s | --species)
+  species="$2" # Species names
+  shift 2
+  ;;
+  -l | --lengths)
+  IFS=',' read -r -a tmp <<< "$2" # path to lengths file for species
+  abs=()
+  for file in "${tmp[@]}"; do
+    abs+=("$(readlink -f "$file")")
+  done
+  lengths=$(IFS=','; echo "${abs[*]}")
+  shift 2
+  ;;
+  --chr_cutoff)
+  chr_cutoff="$2" # Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
+  shift 2
+  ;;
+  --chain_cutoff)
+  chain_cutoff="$2" # Cutoff for chromosome length in bp (Default 1Kbp = 1e4)
+  shift 2
+  ;;
+  --cont_chain_cutoff)
+  cont_chain_cutoff="$2" # Cutoff for chromosome length in bp (Default 1Kbp = 1e4)
+  shift 2
+  ;;
+  --cont_block_cutoff)
+  cont_block_cutoff="$2" # Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
+  shift 2
+  ;;
+  --circos_cutoff)
+  circos_cutoff="$2" # Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
+  shift 2
+  ;;
+  -o | --outdir)
+  outdir=$(readlink --canonicalize "$2") # output directory
+  shift 2
+  ;;
+  -t | --threads)
+  threads="$2" # Threads
+  shift 2
+  ;;
+  --version)
+  echo "circoblock version "$version >&2
+  exit 0
+  ;;
+  -h | --help)
+  print_usage_alluvial
+  exit 1
+  ;;
+  *)
+  if [ -f "$1" ]
+  then
+   break
+  else
+  echo "Unknown option: "$1
+  print_usage_alluvial
+  exit 1
+  fi
+  ;;
+  esac
+ done
+
+ # Dependencies
+
+  if ! command -v Rscript &> /dev/null
+  then
+   echo "R not installed" >&2
+   echo "sudo apt install r-base" >&2
+   deps+="rscript"
+  fi
+  
+  if [ ! -z ${deps+x} ]
+  then
+   exit 1
+  fi
+  
+    if [ -z ${genome+x} ] && [ -z ${tblastn+x} ]
+  then
+   echo "Required: One of --genome or --tblastn" >&2
+   exit 1
+  fi
+  
+  if [ -z ${chains+x} ] || [ -z ${species+x} ] || [ -z ${lengths+x} ]
+  then
+   echo "Required: All of --chains, --species, and --lengths" >&2
+   exit 1
+  fi
+
+  if [ ! -z ${outdir+x} ]
+  then
+   if [ ! -d $outdir ]
+   then
+    mkdir $outdir
+   fi
+  else
+   outdir="circoblock_"$(date +"%Y%m%d_%H%M")
+   mkdir $outdir
+  fi
+  
+  echo "circoblock start: "$(date +"%d/%m/%Y %H:%M:%S") >&2
+    
+  # decompress chain files  
+  IFS=',' read -r -a chain_files <<< "$chains"
+
+  chains_temp=()
+  for chain in "${chain_files[@]}"
+  do
+  if [ $(file --brief "$chain" | cut --fields=1 --delimiter=" ") = "gzip" ]
+  then
+   echo "Decompressing chain file..." >&2
+   gunzip --stdout $chain > $tmpdir"/final.chain"
+   chains_temp+=($(echo $tmpdir"/final.chain"))
+  else
+   chains_temp+=($(echo $chain))
+  fi
+  done
+  chains=$(IFS=','; echo "${chains_temp[*]}")
+  
+  # Map blocks to genome
+  if [ -z ${tblastn+x} ]
+  then
+   tblastn_map
+  fi
+ 
+ Rscript $script_dir"/alluvial.R" \
+ --wd $outdir \
+ --chains "$chains" \
+ --blocks "$tblastn" \
+ --species "$species" \
+ --lengths "$lengths" \
+ --chr_cutoff ${chr_cutoff-1e6} \
+ --chain_cutoff ${chain_cutoff-1e4} \
+ --cont_chain_cutoff ${cont_chain_cutoff-1e4} \
+ --cont_block_cutoff ${cont_block_cutoff-1e6} \
+ --circos_cutoff ${circos_cutoff-1e6}
+ 
+else
+
+  print_usage
+  exit 1
+
+fi
+
+echo "circoblock done: "$(date +"%d/%m/%Y %H:%M:%S") >&2

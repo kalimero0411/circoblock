@@ -1,4 +1,4 @@
-packages = c("ggalluvial","ggplot2","EnrichedHeatmap","rtracklayer","dplyr","zeallot")
+packages = c("R.utils","ggalluvial","ggplot2","EnrichedHeatmap","rtracklayer","dplyr","zeallot")
 invisible(
   suppressMessages(
     if(!require("BiocManager",character.only = TRUE,quietly = TRUE)){

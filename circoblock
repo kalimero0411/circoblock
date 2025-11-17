@@ -106,10 +106,10 @@ function tblastn_map(){
   makeblastdb -in $genome -dbtype nucl
   mkdir $tmpdir/tblastn
   local block_files=($tmpdir/At_blocks/*.genes.pep)
-  for ((k=0;k<${#block_files[@]};k++))
+  for k in ${!block_files[@]}
   do
    local block_pep=${block_files[$k]}
-   echo -en "\rMapping block "${block_pep/.genes.pep}" ("$(($k + 1))"/"${#block_files[@]}")   " >&2
+   echo -en "\rMapping block "$(basename ${block_pep/.genes.pep})" ("$(($k + 1))"/"${#block_files[@]}")   " >&2
    tblastn \
    -query $block_pep \
    -db $genome \
@@ -123,7 +123,7 @@ function tblastn_map(){
   
   # Filter tBLASTn results (100aa length, 80% pident, 5% of matches)
   local blast_files=($tmpdir/tblastn/*.genes.tblastn)
-  for ((k=0;k<${#blast_files[@]};k++))
+  for k in ${!blast_files[@]}
   do
    local blast_out=${blast_files[$k]}
    local block=$(basename ${blast_out/.genes.tblastn})
@@ -186,11 +186,19 @@ arg="$1"
   shift 2
   ;;
   -g1 | --gff1)
-  gff1="$2" # path to gff/gtf/bed file for species1
+  IFS=',' read -r -a tmp <<< "$2" # path to gff/gtf/bed file for species1
+  for i in "${!tmp[@]}"; do
+    tmp[$i]=$(readlink -f -- "${tmp[$i]}")
+  done
+  gff1=$(IFS,; echo "${tmp[*]}")
   shift 2
   ;;
   -g2 | --gff2)
-  gff2="$2" # path to gff/gtf/bed file for species2
+  IFS=',' read -r -a tmp <<< "$2" # path to gff/gtf/bed file for species2
+  for i in "${!tmp[@]}"; do
+    tmp[$i]=$(readlink -f -- "${tmp[$i]}")
+  done
+  gff2=$(IFS,; echo "${tmp[*]}")
   shift 2
   ;;
   -l1 | --lengths1)
@@ -295,21 +303,6 @@ arg="$1"
   
   echo "circoblock start: "$(date +"%d/%m/%Y %H:%M:%S") >&2
   
-  # split gffs
-  OFS=$IFS
-  IFS=","
-  for i in ${gff1[*]}
-  do
-   readlink --canonicalize $i >> $tmpdir"/gff1.tmp"
-  done
-  for i in ${gff2[*]}
-  do
-   readlink --canonicalize $i >> $tmpdir"/gff2.tmp"
-  done
-  gff1=$(cat $tmpdir"/gff1.tmp" | tr "\n" "," | sed --regexp-extended 's/,$//g')
-  gff2=$(cat $tmpdir"/gff2.tmp" | tr "\n" "," | sed --regexp-extended 's/,$//g')
-  IFS=$OFS
-  
   # decompress chain file
   if [ $(file --brief $chain | cut --fields=1 --delimiter=" ") = "gzip" ]
   then
@@ -323,7 +316,6 @@ arg="$1"
   then
    tblastn_map
   fi
- 
  
  Rscript $script_dir"/circos_chain.R" \
  --wd $outdir \
@@ -357,11 +349,10 @@ arg="$1"
   ;;
   -c | --chains)
   IFS=',' read -r -a tmp <<< "$2" # chain file
-  abs=()
-  for file in "${tmp[@]}"; do
-    abs+=("$(readlink -f "$file")")
+  for i in "${!tmp[@]}"; do
+    tmp[$i]=$(readlink -f -- "${tmp[$i]}")
   done
-  chains=$(IFS=','; echo "${abs[*]}")
+  chains=$(IFS,; echo "${tmp[*]}")
   shift 2
   ;;
   -s | --species)
@@ -370,11 +361,10 @@ arg="$1"
   ;;
   -l | --lengths)
   IFS=',' read -r -a tmp <<< "$2" # path to lengths file for species
-  abs=()
-  for file in "${tmp[@]}"; do
-    abs+=("$(readlink -f "$file")")
+  for i in "${!tmp[@]}"; do
+    tmp[$i]=$(readlink -f -- "${tmp[$i]}")
   done
-  lengths=$(IFS=','; echo "${abs[*]}")
+  lengths=$(IFS,; echo "${tmp[*]}")
   shift 2
   ;;
   --chr_cutoff)
@@ -480,7 +470,7 @@ arg="$1"
    chains_temp+=($(echo $chain))
   fi
   done
-  chains=$(IFS=','; echo "${chains_temp[*]}")
+  chains=$(IFS=,; echo "${chains_temp[*]}")
   
   # Map blocks to genome
   if [ -z ${tblastn+x} ]

@@ -1,51 +1,60 @@
-packages = c("circlize","R.utils","EnrichedHeatmap","rtracklayer","dplyr")
+packages = c("circlize","R.utils","EnrichedHeatmap","rtracklayer","dplyr","rstudioapi")
 
-invisible(
-  suppressMessages(
-    if(!require("BiocManager",character.only = TRUE,quietly = TRUE)){
-      cat("Installing BiocManager\n",sep = "")
-      install.packages("BiocManager")
-  }))
-
-cat("#####   Loading packages   #####\n")
-invisible(
-  suppressMessages(
-    lapply(packages,function(x){
-      if(!require(x,character.only = TRUE,quietly = TRUE)){
-        cat("Installing package: ",x,"\n",sep = "")
-        BiocManager::install(x,update = FALSE,ask = FALSE)
-        library(x,character.only = TRUE,quietly = TRUE)
-      }
-    })))
+loadpackages = function(packages){
+  invisible(
+    suppressMessages(
+      if(!require("BiocManager",character.only = TRUE,quietly = TRUE)){
+        cat("Installing BiocManager\n",sep = "")
+        install.packages("BiocManager")
+      }))
+  
+  cat("#####   Loading packages   #####\n")
+  invisible(
+    suppressMessages(
+      lapply(packages,function(x){
+        if(!require(x,character.only = TRUE,quietly = TRUE)){
+          cat("Installing package: ",x,"\n",sep = "")
+          BiocManager::install(x,update = FALSE,ask = FALSE)
+          library(x,character.only = TRUE,quietly = TRUE)
+        }
+      })))
+}
 
 options(stringsAsFactors = FALSE)
 
 init_params = list() 
 
 if(!interactive()){
+  invisible(suppressMessages(if(!require("R.utils",character.only = TRUE,quietly = TRUE)){
+    install.packages("R.utils")
+  }))
   options(rgl.useNULL = TRUE)
   args = R.utils::commandArgs(trailingOnly = TRUE,asValues = TRUE)
   must_args = c("wd","chain","blocks","species1","species2","gff1","gff2","lengths1","lengths2")
   if(!all(must_args %in% names(args))){
-    help = matrix(data = c("--wd    ","Working directory path",
-                           "--chain    ","Chain alignment file",
-                           "--blocks    ","tBLASTn Arabidopsis block alignment file",
-                           "--species1    ","Name of the first species (Query of alignment & blocks)",
-                           "--species2    ","Name of the second species (Subject of alignment)",
-                           "--gff1    ","Species1 gff/gtf/bed file",
-                           "--gff2    ","Species2 gff/gtf/bed file",
-                           "--lengths1    ","Species1 chromosome lengths file",
-                           "--lengths2    ","Species2 chromosome lengths file",
-                           "--chr_cutoff    ","Chromosome length cutoff (default 1Mbp = 1e6)",
-                           "--chain_cutoff    ","Genome chain alignment cutoff (default 1Kbp = 1e4)",
-                           "--cont_chain_cutoff    ","Contiguous chain alignment cutoff (default 1Kbp = 1e4)",
-                           "--cont_block_cutoff    ","Contiguous block alignment cutoff (default 1Mbp = 1e6)",
-                           "--circos_cutoff    ","Circos window cutoff (default 1Mbp = 1e6)"
-                           )
-                  ,ncol = 2,byrow = TRUE)
-    prmatrix(help,quote = FALSE,rowlab = rep("",nrow(help)),collab = rep("",2))
+    print_help <- function() {
+      title = "Create circos plots"
+      opts = rbind(c("--wd    ","Working directory path"),
+                   c("--chain    ","Chain alignment file"),
+                   c("--blocks    ","tBLASTn Arabidopsis block alignment file"),
+                   c("--species1    ","Name of the first species (Query of alignment & blocks)"),
+                   c("--species2    ","Name of the second species (Subject of alignment)"),
+                   c("--gff1    ","Species1 gff/gtf/bed file"),
+                   c("--gff2    ","Species2 gff/gtf/bed file"),
+                   c("--lengths1    ","Species1 chromosome lengths file"),
+                   c("--lengths2    ","Species2 chromosome lengths file"),
+                   c("--chr_cutoff    ","Chromosome length cutoff (default 1Mbp = 1e6)"),
+                   c("--chain_cutoff    ","Genome chain alignment cutoff (default 1Kbp = 1e4)"),
+                   c("--cont_chain_cutoff    ","Contiguous chain alignment cutoff (default 1Kbp = 1e4)"),
+                   c("--cont_block_cutoff    ","Contiguous block alignment cutoff (default 1Mbp = 1e6)"),
+                   c("--circos_cutoff    ","Circos window cutoff (default 1Mbp = 1e6)"))
+      lines = c("Usage: Rscript circos_chain.R [options]","",title,"","Options:",apply(opts, 1, function(r) sprintf("  %-*s  %s", max(nchar(opts[,1])), r[1], r[2]))    )
+      cat(paste0(lines, collapse = "\n"), "\n")
+    }
+    print_help()
     stop(paste0("Missing command line input --> ",paste(must_args[!must_args %in% names(args)],collapse = " | ")), call. = TRUE)
   }
+  loadpackages(packages = packages)
   init_params[["wd"]] = normalizePath(args[["wd"]])
   setwd(init_params[["wd"]])
   init_params[["chain"]] = normalizePath(args[["chain"]])
@@ -87,7 +96,7 @@ if(!interactive()){
   }
   
 }else{
-  suppressMessages(invisible(library(rstudioapi)))
+  loadpackages(packages = packages)
   init_params[["wd"]] = normalizePath(rstudioapi::selectDirectory(caption = "Choose working directory:"))
   setwd(init_params[["wd"]])
   init_params[["chain"]] = normalizePath(selectFile(caption = "Select chain alignment file",path = init_params[["wd"]]))

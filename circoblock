@@ -190,7 +190,7 @@ arg="$1"
   for i in "${!tmp[@]}"; do
     tmp[$i]=$(readlink -f -- "${tmp[$i]}")
   done
-  gff1=$(IFS,; echo "${tmp[*]}")
+  gff1=$(IFS=,; echo "${tmp[*]}")
   shift 2
   ;;
   -g2 | --gff2)
@@ -198,7 +198,7 @@ arg="$1"
   for i in "${!tmp[@]}"; do
     tmp[$i]=$(readlink -f -- "${tmp[$i]}")
   done
-  gff2=$(IFS,; echo "${tmp[*]}")
+  gff2=$(IFS=,; echo "${tmp[*]}")
   shift 2
   ;;
   -l1 | --lengths1)
@@ -352,7 +352,7 @@ arg="$1"
   for i in "${!tmp[@]}"; do
     tmp[$i]=$(readlink -f -- "${tmp[$i]}")
   done
-  chains=$(IFS,; echo "${tmp[*]}")
+  chains=$(IFS=,; echo "${tmp[*]}")
   shift 2
   ;;
   -s | --species)
@@ -364,7 +364,7 @@ arg="$1"
   for i in "${!tmp[@]}"; do
     tmp[$i]=$(readlink -f -- "${tmp[$i]}")
   done
-  lengths=$(IFS,; echo "${tmp[*]}")
+  lengths=$(IFS=,; echo "${tmp[*]}")
   shift 2
   ;;
   --chr_cutoff)

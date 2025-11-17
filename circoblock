@@ -2,7 +2,7 @@
 set -e
 
 # Default parameters
-version=24.09
+version=25.11
 script_dir=$(dirname $(readlink --canonicalize "${BASH_SOURCE[0]}"))
 chr_cutoff=1e6
 chain_cutoff=1e4

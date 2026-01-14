@@ -74,7 +74,7 @@ make_chains.py [input subject genome name] [input query genome name] Subject_gen
 - If `--genome` was provided and the mapping set completed, the output can be used again with `--tblastn [species1].blocks.tblastn`
 
 # Circos
-- GFF files should only include lines that are should be plotted. (e.g. awk -F $'\t' '$3 == "gene"{print $0}' species.gff) 
+- GFF files should only include lines that should be plotted. (e.g. awk -F $'\t' '$3 == "gene"{print $0}' species.gff) 
 
 # Alluvial
 - There should be an equal number (N) of species and lengths files in the same order, and N-1 chain files in the same order (the query species against every other species).

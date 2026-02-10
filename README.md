@@ -5,6 +5,8 @@ Create ancestral block-wise circos/alluvial plots for Brassicales-related speice
 circoblock circos [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species1 species1] [--species2 species2] [-c species1.species2.final.chain] [--gff1 species1.gff] [--gff2 species2.bed] [--lengths1 species1.lengths] [--lengths2 species2.lengths] [-o outdir]
 
 circoblock alluvial [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species species1,species2,species3] [-c species1.species2.final.chain,species1.species3.final.chain] [--lengths species1.lengths,species2.lengths,species3.lengths] [-o outdir]
+
+circoblock chromosome [OPTIONS] [--genome Sequence.fasta | --tblastn species.Arabidopsis.tblastn] [--lengths species.lengths] [-o outdir]
 ```
 
 ## Circos Options
@@ -47,26 +49,43 @@ circoblock alluvial [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--speci
 |          | --version         | Version  |
 | -h           | --help       | Display help  |
 
+## Chromosome Options
+| Short     | Long      | Description     |
+| ------------- | ------------- | -------- |
+| -g         | --genome         | Genome FASTA file (required for mapping step)  |
+| -b          | --tblastn         | tBLASTn output file (skip mapping step)  |
+| -l         | --lengths         | Lengths files starting with the query species in order |
+|          | --chr_cutoff         | Cutoff for chromosome length in bp (Default 1Mbp = 1e6)  |
+|          | --cont_block_cutoff         | Cutoff for chromosome length in bp (Default 1Mbp = 1e6)  |
+| -o          | --outdir         | Output directory (Default = circoblock_DateTime in the current directory)  |
+| -t           | --threads #        | Number of CPU threads to use (Default = Detected processors or 1)  |
+|          | --version         | Version  |
+| -h           | --help       | Display help  |
 
 ## Examples
 
 ### Run tblastn and then circlize
 ```
-circoblock circos --threads 32 --genome TAIR10_genome.fa --species1 'Arabidopsis thaliana' --species2 'Some species' --gff1 TAIR10.gff3 --gff1 TAIR10_TEs.gtf --gff1 species2_genes.bed --gff2 species2_TEs.gff --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir At_sp2
+circoblock circos --threads 32 --genome TAIR10_genome.fa --species1 'Arabidopsis thaliana' --species2 'Some species' --gff1 TAIR10.gff3 --gff1 TAIR10_TEs.gtf --gff1 species2_genes.bed --gff2 species2_TEs.gff --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir path
 ```
 
 ### Run just the circlize
 ```
-circoblock circos --threads 32 --tblastn At.sp2.tblastn --species1 'Arabidopsis thaliana' --species2 'Some species' --gff1 TAIR10.gff3 --gff1 TAIR10_TEs.gtf --gff1 species2_genes.bed --gff2 species2_TEs.gff --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir At_sp2
+circoblock circos --threads 32 --tblastn At.sp2.tblastn --species1 'Arabidopsis thaliana' --species2 'Some species' --gff1 TAIR10.gff3 --gff1 TAIR10_TEs.gtf --gff1 species2_genes.bed --gff2 species2_TEs.gff --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir path
 ```
 
 ### Run tblastn and then alluvial
 ```
-circoblock alluvial --threads 32 --genome TAIR10_genome.fa --lengths 'At.lengths,species2.lengths,species3.lengths' --chains 'chain_dir/At.sp2.final.chain,chain_dir/At.sp3.final.chain' --species 'Arabidopsis thaliana,Some species2,Some species3' --outdir At_sp23
+circoblock alluvial --threads 32 --genome species1_genome.fa --lengths 'species1.lengths,species2.lengths,species3.lengths' --chains 'chain_dir/sp1.sp2.final.chain,chain_dir/sp1.sp3.final.chain' --species 'species1,species2,species3' --outdir path
+```
+
+### Run tblastn and then chromosome
+```
+circoblock chromosome --threads 32 --genome species_genome.fa --lengths species.Chr.lengths --outdir path
 ```
 
 ## Comments
-- Before running, please map the genome using make_lastz_chains (https://github.com/hillerlab/make_lastz_chains):
+- Before running `circos` or `alluvial` , please map the genome using make_lastz_chains (https://github.com/hillerlab/make_lastz_chains):
 ```
 make_chains.py [input subject genome name] [input query genome name] Subject_genome.fasta Query_genome.fasta --pd chain_dir/ -f --chaining_memory 20
 ```
@@ -79,3 +98,5 @@ make_chains.py [input subject genome name] [input query genome name] Subject_gen
 # Alluvial
 - There should be an equal number (N) of species and lengths files in the same order, and N-1 chain files in the same order (the query species against every other species).
 
+# Chromosome
+- The script outputs probabilities of ancestral chromosome Ancestral Crucifer Karyotype (ACK) and Clade E Karyotype (CEK) association with the input chromosomes in text tables, as well as graphical maps, for primary (highest probability) and secondary (second-highest probability) matches.

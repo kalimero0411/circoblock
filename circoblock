@@ -108,7 +108,7 @@ circoblock chromosome [OPTIONS] [--genome Sequence.fasta | --tblastn species.Ara
 
   Length files are tab-delimited: chromosome [TAB] length
 	
-  Example: circoblock chromosome --threads 32 --genome TAIR10_genome.fa --lengths 'species.Chr.lengths' --outdir At_sp23
+  Example: circoblock chromosome --threads 32 --genome species_genome.fa --lengths species.Chr.lengths --outdir At_sp23
   Example with mapped tBLASTn: circoblock chromosome --threads 32 --tblastn species.At.tblastn --lengths 'species.Chr.lengths' --outdir path
 "
 printf "$usage" | awk -F $'\t' '{ printf "%-30s %s\n", $1, $2 }'

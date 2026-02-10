@@ -2,7 +2,7 @@
 set -e
 
 # Default parameters
-version=25.11
+version=26.02
 script_dir=$(dirname $(readlink --canonicalize "${BASH_SOURCE[0]}"))
 chr_cutoff=1e6
 chain_cutoff=1e4
@@ -20,11 +20,12 @@ cleanup(){
 trap cleanup EXIT
 
 function print_usage(){
-usage="Create ancestral block-wise circos/alluvial plots for Brassicales-related speices
+usage="Create ancestral block-wise circos, alluvial or chromosome plots for Brassicales-related speices
 
 circoblock [plot type]
   circos\t Create a circos plot for two species and multiple annotation
   alluvial\t Create an alluvial plot for multiple species
+  chromosome\t Create a chromosome map plot for one species
 "
 printf "$usage" | awk -F $'\t' '{ printf "%-30s %s\n", $1, $2 }'
 }
@@ -32,7 +33,7 @@ printf "$usage" | awk -F $'\t' '{ printf "%-30s %s\n", $1, $2 }'
 function print_usage_circos(){
 local usage="Create ancestral block-wise circos plots for Brassicales-related speices
 
-circoblock [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species1 species1] [--species2 species2] [-c species1.species2.final.chain] [--gff1 species1.gff] [--gff2 species2.bed] [--lengths1 species1.lengths] [--lengths2 species2.lengths] [-o outdir]
+circoblock circos [OPTIONS] [--genome Sequence.fasta | --tblastn species1.tblastn] [--species1 species1] [--species2 species2] [-c species1.species2.final.chain] [--gff1 species1.gff] [--gff2 species2.bed] [--lengths1 species1.lengths] [--lengths2 species2.lengths] [--outdir outdir]
   -g | --genome	Query genome FASTA file  (required for mapping step)
   -b | --tblastn	tBLASTn output file (skip mapping step)
   -s1 | --species1	Query species name
@@ -57,7 +58,7 @@ circoblock [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species1 speci
 	
   Length files are tab-delimited: chromosome [TAB] length
 	
-  Example: circoblock circos --threads 32 --genome TAIR10_genome.fa --species1 'Arabidopsis thaliana' --species2 'Some species' --gff1 TAIR10.gff3 --gff1 TAIR10_TEs.gtf --gff1 species2_genes.bed --gff2 species2_TEs.gff --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir At_sp2
+  Example: circoblock circos --threads 32 --genome TAIR10_genome.fa --species1 'Arabidopsis thaliana' --species2 'Some species' --gff1 TAIR10.gff3 --gff1 TAIR10_TEs.gtf --gff1 species2_genes.bed --gff2 species2_TEs.gff --lengths1 TAIR10.lengths --lengths2 species2.lengths -c chain_dir/At.sp2.final.chain --outdir path
 "
 printf "$usage" | awk -F $'\t' '{ printf "%-30s %s\n", $1, $2 }'
 }
@@ -65,7 +66,7 @@ printf "$usage" | awk -F $'\t' '{ printf "%-30s %s\n", $1, $2 }'
 function print_usage_alluvial(){
  printf "Create ancestral block-wise alluvial plots for Brassicales-related speices
 
-circoblock [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species1 species1] [--species2 species2] [-c species1.species2.final.chain] [--gff1 species1.gff] [--gff2 species2.bed] [--lengths1 species1.lengths] [--lengths2 species2.lengths] [-o outdir]
+circoblock alluvial [OPTIONS] [--genome Sequence.fasta | --tblastn species1.species2.tblastn] [--species species1,species2,...] [--chains species1.species2.final.chain,species1.species3.final.chain,...] [--lengths species1.lengths,species2.lengths,...] [-o outdir]
   -g | --genome\t Query genome FASTA file  (required for mapping step)
   -b | --tblastn\t tBLASTn output file (skip mapping step)
   -s | --species\t Species names starting with the query species in order (required; comma-separated)
@@ -86,7 +87,29 @@ circoblock [OPTIONS] [-g Sequence.fasta | -b species1.tblastn] [--species1 speci
 	
   Length files are tab-delimited: chromosome [TAB] length
 	
-  Example: circoblock alluvial --threads 32 --genome TAIR10_genome.fa --lengths 'At.lengths,species2.lengths,species3.lengths' --chains 'chain_dir/At.sp2.final.chain,chain_dir/At.sp3.final.chain' --species 'Arabidopsis thaliana,Some species2,Some species3' --outdir At_sp23
+  Example: circoblock alluvial --threads 32 --genome TAIR10_genome.fa --lengths 'At.lengths,species2.lengths,species3.lengths' --chains 'chain_dir/At.sp2.final.chain,chain_dir/At.sp3.final.chain' --species 'Arabidopsis thaliana,Some species2,Some species3' --outdir path
+"
+printf "$usage" | awk -F $'\t' '{ printf "%-30s %s\n", $1, $2 }'
+}
+
+function print_usage_chromosome(){
+ printf "Create chromosome map plots and ancestral chromosome probabilities (ACK and CEK models) for Brassicales-related speices
+
+circoblock chromosome [OPTIONS] [--genome Sequence.fasta | --tblastn species.Arabidopsis.tblastn] [--lengths species.lengths] [-o outdir]
+  -g | --genome\t Query genome FASTA file  (required for mapping step)
+  -b | --tblastn\t tBLASTn output file (skip mapping step)
+  -l | --lengths\t Lengths files starting with the query species in order
+  --chr_cutoff\t Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
+  --cont_block_cutoff\t Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
+  -o | --outdir\t Output directory (Default = circoblock_DateTime in the current directory)
+  -t | --threads\t Number of CPU threads to use (Default = Detected processors or 1)
+  --version\t Version
+  -h | --help\t Print help
+
+  Length files are tab-delimited: chromosome [TAB] length
+	
+  Example: circoblock chromosome --threads 32 --genome TAIR10_genome.fa --lengths 'species.Chr.lengths' --outdir At_sp23
+  Example with mapped tBLASTn: circoblock chromosome --threads 32 --tblastn species.At.tblastn --lengths 'species.Chr.lengths' --outdir path
 "
 printf "$usage" | awk -F $'\t' '{ printf "%-30s %s\n", $1, $2 }'
 }
@@ -154,12 +177,17 @@ if [ "$#" -gt 0 ]
 then
  plot="$1"
  shift
+ if ! ([ ${plot} = "circos" ] || [ ${plot} = "alluvial" ] || [ ${plot} = "chromosome" ])
+ then
+  print_usage
+  exit 1
+ fi
 else
  print_usage
  exit 1
 fi
 
-if [ ${plot:0:1} = "c" ]
+if [ ${plot} = "circos" ]
 then
 while [ "$#" -gt 0 ]
 do
@@ -327,13 +355,13 @@ arg="$1"
  --gff2 "$gff2" \
  --lengths1 $lengths1 \
  --lengths2 $lengths2 \
- --chr_cutoff ${chr_cutoff-1e6} \
- --chain_cutoff ${chain_cutoff-1e4} \
- --cont_chain_cutoff ${cont_chain_cutoff-1e4} \
- --cont_block_cutoff ${cont_block_cutoff-1e6} \
- --circos_cutoff ${circos_cutoff-1e6}
+ --chr_cutoff ${chr_cutoff} \
+ --chain_cutoff ${chain_cutoff} \
+ --cont_chain_cutoff ${cont_chain_cutoff} \
+ --cont_block_cutoff ${cont_block_cutoff} \
+ --circos_cutoff ${circos_cutoff}
  
- elif [ ${plot:0:1} = "a" ]
+ elif [ ${plot} = "alluvial" ]
  then
 while [ "$#" -gt 0 ]
 do
@@ -344,7 +372,7 @@ arg="$1"
   shift 2
   ;;
   -b | --tblastn)
-  tblastn=$(readlink --canonicalize "$2") # genome FASTA file path
+  tblastn=$(readlink --canonicalize "$2") # tBLASTn alignment file
   shift 2
   ;;
   -c | --chains)
@@ -484,17 +512,124 @@ arg="$1"
  --blocks "$tblastn" \
  --species "$species" \
  --lengths "$lengths" \
- --chr_cutoff ${chr_cutoff-1e6} \
- --chain_cutoff ${chain_cutoff-1e4} \
- --cont_chain_cutoff ${cont_chain_cutoff-1e4} \
- --cont_block_cutoff ${cont_block_cutoff-1e6} \
- --circos_cutoff ${circos_cutoff-1e6}
+ --chr_cutoff ${chr_cutoff} \
+ --chain_cutoff ${chain_cutoff} \
+ --cont_chain_cutoff ${cont_chain_cutoff} \
+ --cont_block_cutoff ${cont_block_cutoff} \
+ --circos_cutoff ${circos_cutoff}
  
-else
+elif [ ${plot} = "chromosome" ]
+then
+while [ "$#" -gt 0 ]
+do
+arg="$1"
+ case $arg in
+  -g | --genome)
+  genome=$(readlink --canonicalize "$2") # genome FASTA file path
+  shift 2
+  ;;
+  -b | --tblastn)
+  tblastn=$(readlink --canonicalize "$2") # tBLASTn alignment file
+  shift 2
+  ;;
+  -l | --lengths)
+  lengths=$(readlink --canonicalize "$2")
+  shift 2
+  ;;
+  --cont_block_cutoff)
+  cont_block_cutoff="$2" # Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
+  shift 2
+  ;;
+  --chr_cutoff)
+  chr_cutoff="$2" # Cutoff for chromosome length in bp (Default 1Mbp = 1e6)
+  shift 2
+  ;;
+  -o | --outdir)
+  outdir=$(readlink --canonicalize "$2") # output directory
+  shift 2
+  ;;
+  -t | --threads)
+  threads="$2" # Threads
+  shift 2
+  ;;
+  --version)
+  echo "circoblock version "$version >&2
+  exit 0
+  ;;
+  -h | --help)
+  print_usage_chromosome
+  exit 1
+  ;;
+  *)
+  if [ -f "$1" ]
+  then
+   break
+  else
+  echo "Unknown option: "$1
+  print_usage_chromosome
+  exit 1
+  fi
+  ;;
+  esac
+ done
 
+ # Dependencies
+
+  if ! command -v Rscript &> /dev/null
+  then
+   echo "R not installed" >&2
+   echo "sudo apt install r-base" >&2
+   deps+="rscript"
+  fi
+  
+  if [ ! -z ${deps+x} ]
+  then
+   exit 1
+  fi
+  
+  if [ -z ${genome+x} ] && [ -z ${tblastn+x} ]
+  then
+   echo "Required: One of --genome or --tblastn" >&2
+   exit 1
+  fi
+  
+  if [ -z ${lengths+x} ]
+  then
+   echo "Required chromosome lengths (--lengths)" >&2
+   exit 1
+  fi
+
+  if [ ! -z ${outdir+x} ]
+  then
+   if [ ! -d $outdir ]
+   then
+    mkdir $outdir
+   fi
+  else
+   outdir="circoblock_"$(date +"%Y%m%d_%H%M")
+   mkdir $outdir
+  fi
+  
+  echo "circoblock start: "$(date +"%d/%m/%Y %H:%M:%S") >&2
+      
+  # Map blocks to genome
+  if [ -z ${tblastn+x} ]
+  then
+   tblastn_map
+  fi
+ 
+ Rscript $script_dir"/blocks_prob.R" \
+ --wd $outdir \
+ --blocks "$tblastn" \
+ --chr_lengths "$lengths" \
+ --chr_cutoff ${chr_cutoff} \
+ --cont_block_cutoff ${cont_block_cutoff}
+ 
+ else
+ 
   print_usage
   exit 1
-
+ 
 fi
 
 echo "circoblock done: "$(date +"%d/%m/%Y %H:%M:%S") >&2
